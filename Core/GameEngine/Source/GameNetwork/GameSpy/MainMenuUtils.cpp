@@ -524,12 +524,9 @@ static GHTTPBool gamePatchCheckCallback( GHTTPRequest request, GHTTPResult resul
 		ok &= line.nextToken(&url, " ");
 		if (ok && type == "patch")
 		{
-			DEBUG_LOG(("Saw a patch: %d/[%s]", atoi(req.str()), url.str()));
-			queuePatch( atoi(req.str()), url );
-			if (atoi(req.str()))
-			{
-				mustDownloadPatch = TRUE;
-			}
+			// FKK Edition: never download patches offered by the server. Updates come only
+			// through the FKK starter (HTTPS + SHA-256), not over plain HTTP/FTP from here.
+			DEBUG_LOG(("Ignoring offered patch: %d/[%s]", atoi(req.str()), url.str()));
 		}
 		else if (ok && type == "server")
 		{

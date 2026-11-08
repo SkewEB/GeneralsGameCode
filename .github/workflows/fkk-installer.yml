@@ -32,17 +32,30 @@ jobs:
         id: src
         shell: pwsh
         run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $runId = "${{ inputs.run_id }}"
-            $sha = gh api repos/${{ github.repository }}/actions/runs/$runId --jq .head_sha
+          # inputs come in via env, never pasted into the script text
+          if ($env:EVENT_NAME -eq "workflow_dispatch") {
+            $runId = $env:INPUT_RUN_ID
+            if ($runId -notmatch '^[0-9]+$') { throw "run_id must be a number" }
+            $run = gh api repos/$env:REPO/actions/runs/$runId | ConvertFrom-Json
+            # only package push builds of main (replay checks fail on the fork, so no conclusion check)
+            if ($run.head_branch -ne "main" -or $run.event -ne "push" -or $run.head_repository.full_name -ne $env:REPO) {
+              throw "run $runId is not a push build of main"
+            }
+            $sha = $run.head_sha
           } else {
-            $runId = "${{ github.event.workflow_run.id }}"
-            $sha = "${{ github.event.workflow_run.head_sha }}"
+            $runId = $env:WR_RUN_ID
+            $sha = $env:WR_HEAD_SHA
           }
+          if ($sha -notmatch '^[0-9a-f]{40}$') { throw "unexpected sha" }
           "run_id=$runId" >> $env:GITHUB_OUTPUT
           "sha=$sha" >> $env:GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_RUN_ID: ${{ inputs.run_id }}
+          REPO: ${{ github.repository }}
+          WR_RUN_ID: ${{ github.event.workflow_run.id }}
+          WR_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
 
       # installer sources come from the current main, the game binaries from the source run
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -77,10 +90,13 @@ jobs:
           Set-Content -NoNewline -Path fkk\installer\output\fkk-version.txt -Value "$shortSha"
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) {
-            choco install innosetup -y --no-progress
+            choco install innosetup --version=6.4.3 -y --no-progress
           }
           & $iscc /Qp "/DAppVersion=$version" "/DGameDir=$PWD\game" "/DStarterExe=$PWD\fkk\installer\FKK-Starter.exe" fkk\installer\fkk.iss
           if ($LASTEXITCODE -ne 0) { exit 1 }
+          # checksum for the starter's update check
+          $hash = (Get-FileHash -Algorithm SHA256 fkk\installer\output\FKK-Setup.exe).Hash.ToLowerInvariant()
+          Set-Content -NoNewline -Path fkk\installer\output\FKK-Setup.exe.sha256 -Value "$hash  FKK-Setup.exe"
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "version=$version" >> $env:GITHUB_OUTPUT
 
@@ -91,7 +107,7 @@ jobs:
         run: |
           Compress-Archive -Path game\generalszh.pdb -DestinationPath fkk\installer\output\generalszh-pdb.zip
           gh release create "${{ steps.setup.outputs.tag }}" `
-            fkk\installer\output\FKK-Setup.exe fkk\installer\output\fkk-version.txt fkk\installer\output\generalszh-pdb.zip `
+            fkk\installer\output\FKK-Setup.exe fkk\installer\output\FKK-Setup.exe.sha256 fkk\installer\output\fkk-version.txt fkk\installer\output\generalszh-pdb.zip `
             --repo ${{ github.repository }} `
             --target "${{ steps.src.outputs.sha }}" `
             --title "FKK Edition ${{ steps.setup.outputs.version }}" `

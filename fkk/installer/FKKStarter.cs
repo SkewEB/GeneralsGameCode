@@ -4,6 +4,8 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 using System.Drawing;
@@ -16,6 +18,7 @@ static class FKKStarter
 	const string ReleaseBase = "https://github.com/SkewEB/GeneralsGameCode/releases/latest/download/";
 	const string VersionFile = "fkk-version.txt";
 	const string SetupFile = "FKK-Setup.exe";
+	const string HashFile = "FKK-Setup.exe.sha256";
 	const string GameExe = "generalszh.exe";
 
 	[STAThread]
@@ -122,10 +125,29 @@ static class FKKStarter
 		using (var wc = new TimeoutWebClient(8000))
 			remote = wc.DownloadString(ReleaseBase + VersionFile).Trim();
 
-		if (remote.Length == 0 || remote.Length > 64 || remote == local)
+		// the version is the game build commit (short sha); anything else is rejected
+		if (!Regex.IsMatch(remote, "^[0-9a-f]{7,40}$") || remote == local)
 			return false;
 
-		string setup = Path.Combine(Path.GetTempPath(), "FKK-Setup-" + remote + ".exe");
+		// expected SHA-256 of FKK-Setup.exe, published by the installer workflow next to it
+		string expectedHash;
+		using (var wc = new TimeoutWebClient(8000))
+			expectedHash = wc.DownloadString(ReleaseBase + HashFile).Trim().Split(' ')[0].ToLowerInvariant();
+		if (!Regex.IsMatch(expectedHash, "^[0-9a-f]{64}$"))
+			return false;
+
+		// leftovers of earlier updates
+		try
+		{
+			foreach (string old in Directory.GetDirectories(Path.GetTempPath(), "FKK-Update-*"))
+				try { Directory.Delete(old, true); } catch (Exception) { }
+		}
+		catch (Exception) { }
+
+		// private download folder of this user, fresh for every update
+		string updateDir = Path.Combine(Path.GetTempPath(), "FKK-Update-" + Guid.NewGuid().ToString("N"));
+		Directory.CreateDirectory(updateDir);
+		string setup = Path.Combine(updateDir, "FKK-Setup-" + remote + ".exe");
 		splash.Hide();
 
 		Form form = new Form();
@@ -158,6 +180,36 @@ static class FKKStarter
 			return false; // cancelled or failed: start the old version
 		}
 
+		// Lock the file against writes while it is checked and started, so nothing can swap
+		// it between the hash check and the admin prompt. Windows can still read and run it.
+		FileStream locked = new FileStream(setup, FileMode.Open, FileAccess.Read, FileShare.Read);
+		try
+		{
+			string actualHash;
+			using (SHA256 sha = SHA256.Create())
+				actualHash = BitConverter.ToString(sha.ComputeHash(locked)).Replace("-", "").ToLowerInvariant();
+			if (actualHash != expectedHash)
+			{
+				locked.Dispose();
+				locked = null;
+				try { File.Delete(setup); } catch (Exception) { }
+				splash.Hide();
+				MessageBox.Show("Das heruntergeladene Update ist beschaedigt oder wurde veraendert und wird nicht installiert.\nDas Spiel startet mit der bisherigen Version.",
+					"FKK Edition", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+				splash.Show();
+				return false;
+			}
+			return StartSetup(setup, splash);
+		}
+		finally
+		{
+			if (locked != null)
+				locked.Dispose();
+		}
+	}
+
+	static bool StartSetup(string setup, Form splash)
+	{
 		var psi = new ProcessStartInfo(setup);
 		psi.Arguments = "/SILENT /SUPPRESSMSGBOXES /NORESTART /FKKUPDATE=1";
 		psi.UseShellExecute = true;
