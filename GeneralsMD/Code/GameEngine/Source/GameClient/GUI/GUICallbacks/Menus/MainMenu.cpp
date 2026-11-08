@@ -58,6 +58,8 @@
 #include "GameClient/WindowVideoManager.h"
 #include "GameClient/CampaignManager.h"
 #include "GameClient/HotKey.h"
+#include "GameClient/Image.h"
+#include "Common/FileSystem.h"
 #include "GameClient/GameClient.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/ScriptEngine.h"
@@ -405,6 +407,63 @@ GameWindow *win = nullptr;
 
 }
 
+// FKK Edition: show the Fliesen Kalisch logo in the top left corner of the main menu.
+// Texture is a loose file shipped with the FKK installer: Art/Textures/FKKLogo.tga
+// (512x256, logo in the top left 397x161 area). Purely cosmetic, skipped if missing.
+static void initFKKLogo( GameWindow *parent )
+{
+	if ( parent == nullptr || TheMappedImageCollection == nullptr )
+		return;
+
+	const NameKeyType logoID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:FKKLogo" );
+	if ( TheWindowManager->winGetWindowFromId( parent, logoID ) != nullptr )
+		return;
+
+	const Image *image = TheMappedImageCollection->findImageByName( "FKKLogo" );
+	if ( image == nullptr )
+	{
+		if ( !TheFileSystem->doesFileExist( "Art/Textures/FKKLogo.tga" ) )
+			return;
+
+		Image *newImage = newInstance(Image);
+		newImage->setName( "FKKLogo" );
+		newImage->setFilename( "FKKLogo.tga" );
+		newImage->setStatus( IMAGE_STATUS_NONE );
+		Region2D uv;
+		uv.lo.x = 0.0f;
+		uv.lo.y = 0.0f;
+		uv.hi.x = 397.0f / 512.0f;
+		uv.hi.y = 161.0f / 256.0f;
+		newImage->setUV( &uv );
+		newImage->setTextureWidth( 512 );
+		newImage->setTextureHeight( 256 );
+		ICoord2D imageSize;
+		imageSize.x = 397;
+		imageSize.y = 161;
+		newImage->setImageSize( &imageSize );
+		TheMappedImageCollection->addImage( newImage );
+		image = newImage;
+	}
+
+	Int parentWidth = 0, parentHeight = 0;
+	parent->winGetSize( &parentWidth, &parentHeight );
+	if ( parentWidth <= 0 || parentHeight <= 0 )
+		return;
+
+	const Int height = parentHeight * 16 / 100;
+	const Int width = height * 397 / 161;
+	const Int margin = parentHeight * 2 / 100;
+
+	GameWindow *logo = TheWindowManager->winCreate( parent,
+		WIN_STATUS_ENABLED | WIN_STATUS_IMAGE | WIN_STATUS_NO_INPUT,
+		margin, margin, width, height, nullptr );
+	if ( logo == nullptr )
+		return;
+
+	logo->winSetWindowId( logoID );
+	logo->winSetEnabledImage( 0, image );
+}
+
 // TheSuperHackers @tweak Now prints version information in an optional version label.
 // Originally this label does not exist in the Main Menu. It can be copied from the Options Menu.
 static void initLabelVersion()
@@ -556,6 +615,7 @@ void MainMenuInit( WindowLayout *layout, void *userData )
 #endif
 
 	initLabelVersion();
+	initFKKLogo( parentMainMenu );
 
 	//TheShell->registerWithAnimateManager(buttonCampaign, WIN_ANIMATION_SLIDE_LEFT, TRUE, 800);
 	//TheShell->registerWithAnimateManager(buttonSkirmish, WIN_ANIMATION_SLIDE_LEFT, TRUE, 600);
