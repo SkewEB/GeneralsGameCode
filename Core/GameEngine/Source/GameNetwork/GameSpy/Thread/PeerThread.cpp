@@ -1121,8 +1121,16 @@ static SerialAuthResult doCDKeyAuthentication( PEER peer )
 		CheckServers(peer);
 #endif // SERVER_DEBUGGING
 	}
+	else
+	{
+		// FKK: installs from the EA app have no key entry in the registry at all, and our own
+		// server does not check keys anyway. Without this the game disconnects itself from the
+		// lobby (DISCONNECT_SERIAL_NOT_PRESENT) before the server is even asked.
+		DEBUG_LOG(("No CD key entry in the registry, skipping the key check for the FKK server"));
+		retval = SERIAL_OK;
+	}
 
-	if (retval == SERIAL_OK)
+	if (retval == SERIAL_OK && s.isNotEmpty())
 	{
 		PSRequest req;
 		req.requestType = PSRequest::PSREQUEST_READCDKEYSTATS;
