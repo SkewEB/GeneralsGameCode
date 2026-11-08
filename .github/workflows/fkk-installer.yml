@@ -88,8 +88,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          Compress-Archive -Path game\generalszh.pdb -DestinationPath fkk\installer\output\generalszh-pdb.zip
           gh release create "${{ steps.setup.outputs.tag }}" `
-            fkk\installer\output\FKK-Setup.exe fkk\installer\output\fkk-version.txt `
+            fkk\installer\output\FKK-Setup.exe fkk\installer\output\fkk-version.txt fkk\installer\output\generalszh-pdb.zip `
             --repo ${{ github.repository }} `
             --target "${{ steps.src.outputs.sha }}" `
             --title "FKK Edition ${{ steps.setup.outputs.version }}" `
