@@ -1,0 +1,64 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3b75af7..b272278 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -65,6 +65,13 @@ if(GAMESPY_SERVER_NAME)
+     message(STATUS "GameSpy server name is set to ${GAMESPY_SERVER_NAME}")
+ endif()
+ 
++# Resolve every <service>.GSI_DOMAIN_NAME host to GSI_DOMAIN_NAME itself, so a
++# private server only needs a single DNS record instead of a wildcard.
++if(GAMESPY_SINGLE_HOST)
++    add_definitions(-DGSI_SINGLE_HOST)
++    message(STATUS "GameSpy services resolve to the single host ${GAMESPY_SERVER_NAME}")
++endif()
++
+ list(APPEND GS_COMPILE_DEFS GS_PEER)
+ 
+ if(GS_WINSOCK2)
+diff --git a/include/gamespy/gsplatformsocket.h b/include/gamespy/gsplatformsocket.h
+index 7b0039d..82dda00 100644
+--- a/include/gamespy/gsplatformsocket.h
++++ b/include/gamespy/gsplatformsocket.h
+@@ -630,6 +630,11 @@ gsi_u32 gsiGetBroadcastIP(void);
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ ///////////////////////////////////////////////////////////////////////////////
++#if defined(GSI_SINGLE_HOST) && defined(_WIN32) && !defined(_XBOX)
++struct hostent* gsiSingleHostLookup(const char* name);
++#define gethostbyname(n) gsiSingleHostLookup(n)
++#endif
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/src/common/gsplatformsocket.c b/src/common/gsplatformsocket.c
+index 2239795..695f988 100644
+--- a/src/common/gsplatformsocket.c
++++ b/src/common/gsplatformsocket.c
+@@ -652,6 +652,25 @@ gsi_u32 gsiGetBroadcastIP(void)
+ ///////////////////////////////////////////////////////////////////////////////
+ ///////////////////////////////////////////////////////////////////////////////
+ 
++#if defined(GSI_SINGLE_HOST) && defined(_WIN32) && !defined(_XBOX)
++// Map "<anything>." GSI_DOMAIN_NAME onto GSI_DOMAIN_NAME, then do the real lookup.
++#undef gethostbyname
++struct hostent* gsiSingleHostLookup(const char* name)
++{
++    static const char domain[] = GSI_DOMAIN_NAME;
++    const size_t domainLen = sizeof(domain) - 1;
++    size_t nameLen;
++
++    if (name != NULL) {
++        nameLen = strlen(name);
++        if (nameLen > domainLen + 1 && name[nameLen - domainLen - 1] == '.' &&
++            _stricmp(name + nameLen - domainLen, domain) == 0)
++            name = domain;
++    }
++    return gethostbyname(name);
++}
++#endif
++
+ // Re-enable previously disabled compiler warnings
+ ///////////////////////////////////////////////////
+ #if defined(_MSC_VER)
