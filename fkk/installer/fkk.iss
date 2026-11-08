@@ -90,6 +90,9 @@ var
   DataPage: TInputQueryWizardPage;
   DownloadPage: TDownloadWizardPage;
   DataDownload: Boolean;
+  HDPage: TInputQueryWizardPage;
+  HDCheck: TNewCheckBox;
+  HDDownload: Boolean;
 
 function IsDataDownload(): Boolean;
 begin
@@ -145,9 +148,21 @@ begin
   Result := ('{#ZHDataSHA256}' <> '') and ('{#GenDataSHA256}' <> '');
 end;
 
+function HDAvailable(): Boolean;
+begin
+  Result := '{#HDSHA1}' <> '';
+end;
+
+procedure AddHDPart(const FileName, Hash: String);
+begin
+  if Hash <> '' then
+    DownloadPage.Add('{#DataBaseURL}' + FileName, FileName, Hash);
+end;
+
 procedure InitializeWizard();
 begin
   DataDownload := False;
+  HDDownload := False;
   DataPage := CreateInputQueryPage(wpWelcome,
     'Zero Hour nicht gefunden',
     'Spieldaten vom FKK-Server laden',
@@ -155,7 +170,23 @@ begin
     'Lass die Felder leer, wenn du den Zero-Hour-Ordner lieber selbst auswählen willst.');
   DataPage.Add('Benutzername:', False);
   DataPage.Add('Passwort:', True);
-  DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), 'Spieldaten werden geladen (ca. 3 GB) ...', nil);
+  DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), 'Dateien werden vom FKK-Server geladen ...', nil);
+
+  // optional HD textures (AI-upscaled originals), same server and access data
+  HDPage := CreateInputQueryPage(wpSelectDir,
+    'HD-Texturen (optional)',
+    'Schärfere Einheiten und Gebäude',
+    'Die FKK-Edition kann hochgerechnete Texturen (doppelte Auflösung) für Einheiten und Gebäude mitladen ({#HDSize}). ' +
+    'Gameplay und Online-Spiel bleiben gleich, es braucht nur mehr Grafikspeicher.' + #13#10 + #13#10 +
+    'Zugangsdaten wie beim FKK-Spieldaten-Download (bekommst du von Kewe).');
+  HDPage.Add('Benutzername:', False);
+  HDPage.Add('Passwort:', True);
+  HDCheck := TNewCheckBox.Create(HDPage);
+  HDCheck.Parent := HDPage.Surface;
+  HDCheck.Caption := 'HD-Texturen laden';
+  HDCheck.Checked := True;
+  HDCheck.Top := HDPage.Edits[1].Top + HDPage.Edits[1].Height + ScaleY(16);
+  HDCheck.Width := HDPage.SurfaceWidth;
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
@@ -163,6 +194,8 @@ begin
   Result := False;
   if PageID = DataPage.ID then
     Result := IsAutoUpdate() or (not DataDownloadAvailable()) or IsZHDir(WizardDirValue);
+  if PageID = HDPage.ID then
+    Result := IsAutoUpdate() or (not HDAvailable());
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -174,11 +207,32 @@ begin
       WizardForm.DirEdit.Text := ExpandConstant('{commonpf32}\Generals FKK Edition\Zero Hour');
     Exit;
   end;
-  if (CurPageID = wpReady) and DataDownload then begin
-    SetDownloadCredentials(Trim(DataPage.Values[0]), DataPage.Values[1]);
+  if CurPageID = HDPage.ID then begin
+    // reuse the game-data access entered before
+    if DataDownload and (Trim(HDPage.Values[0]) = '') then begin
+      HDPage.Values[0] := DataPage.Values[0];
+      HDPage.Values[1] := DataPage.Values[1];
+    end;
+    HDDownload := HDCheck.Checked;
+    if HDDownload and ((Trim(HDPage.Values[0]) = '') or (HDPage.Values[1] = '')) then begin
+      MsgBox('Für die HD-Texturen bitte Benutzername und Passwort eingeben oder den Haken entfernen.', mbInformation, MB_OK);
+      Result := False;
+    end;
+    Exit;
+  end;
+  if (CurPageID = wpReady) and (DataDownload or HDDownload) then begin
     DownloadPage.Clear;
-    DownloadPage.Add('{#DataBaseURL}{#ZHDataFile}', '{#ZHDataFile}', '{#ZHDataSHA256}');
-    DownloadPage.Add('{#DataBaseURL}{#GenDataFile}', '{#GenDataFile}', '{#GenDataSHA256}');
+    if DataDownload then begin
+      SetDownloadCredentials(Trim(DataPage.Values[0]), DataPage.Values[1]);
+      DownloadPage.Add('{#DataBaseURL}{#ZHDataFile}', '{#ZHDataFile}', '{#ZHDataSHA256}');
+      DownloadPage.Add('{#DataBaseURL}{#GenDataFile}', '{#GenDataFile}', '{#GenDataSHA256}');
+    end else
+      SetDownloadCredentials(Trim(HDPage.Values[0]), HDPage.Values[1]);
+    if HDDownload then begin
+      AddHDPart('{#HDFile1}', '{#HDSHA1}');
+      AddHDPart('{#HDFile2}', '{#HDSHA2}');
+      AddHDPart('{#HDFile3}', '{#HDSHA3}');
+    end;
     DownloadPage.Show;
     try
       try
@@ -187,7 +241,7 @@ begin
         if DownloadPage.AbortedByUser then
           Log('Download abgebrochen')
         else
-          MsgBox('Spieldaten konnten nicht geladen werden (falsches Passwort oder Server nicht erreichbar):' + #13#10 + GetExceptionMessage, mbError, MB_OK);
+          MsgBox('Download vom FKK-Server fehlgeschlagen (falsches Passwort oder Server nicht erreichbar):' + #13#10 + GetExceptionMessage, mbError, MB_OK);
         Result := False;
       end;
     finally
@@ -229,10 +283,29 @@ begin
     Result := Result + Chars[Random(Length(Chars)) + 1];
 end;
 
+// HD pack: zip of Art\Textures\*.dds, extracted over the game folder; the file list is
+// kept so that the uninstaller removes exactly these files
+procedure ExtractHDPart(const Archive, Hash: String);
+var
+  Code: Integer;
+begin
+  if Hash = '' then Exit;
+  ExtractData(Archive, ExpandConstant('{app}'));
+  Exec(ExpandConstant('{cmd}'), '/c ""' + TarExe() + '" -tf "' + ExpandConstant('{tmp}\') + Archive + '" >> "' +
+    ExpandConstant('{app}\fkk-hd-files.txt') + '""', '', SW_HIDE, ewWaitUntilTerminated, Code);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   Exe, Serial: String;
 begin
+  if (CurStep = ssPostInstall) and HDDownload then begin
+    WizardForm.StatusLabel.Caption := 'HD-Texturen werden entpackt ...';
+    DeleteFile(ExpandConstant('{app}\fkk-hd-files.txt'));
+    ExtractHDPart('{#HDFile1}', '{#HDSHA1}');
+    ExtractHDPart('{#HDFile2}', '{#HDSHA2}');
+    ExtractHDPart('{#HDFile3}', '{#HDSHA3}');
+  end;
   if (CurStep = ssInstall) and DataDownload then begin
     ExtractData('{#ZHDataFile}', ExpandConstant('{app}'));
     ExtractData('{#GenDataFile}', ExpandConstant('{app}\GeneralsBase'));
@@ -251,8 +324,23 @@ end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
-  Exe: String;
+  Exe, ListFile, Name: String;
+  Files: TArrayOfString;
+  I: Integer;
 begin
+  if CurUninstallStep = usUninstall then begin
+    ListFile := ExpandConstant('{app}\fkk-hd-files.txt');
+    if LoadStringsFromFile(ListFile, Files) then begin
+      for I := 0 to GetArrayLength(Files) - 1 do begin
+        Name := Trim(Files[I]);
+        StringChangeEx(Name, '/', '\', True);
+        // only plain relative paths below Art\Textures
+        if (Pos('..', Name) = 0) and (CompareText(Copy(Name, 1, 13), 'Art\Textures\') = 0) then
+          DeleteFile(ExpandConstant('{app}\') + Name);
+      end;
+      DeleteFile(ListFile);
+    end;
+  end;
   if CurUninstallStep = usPostUninstall then begin
     Exe := ExpandConstant('{app}\generalszh.exe');
     if FileExists(Exe + '.original') then begin
