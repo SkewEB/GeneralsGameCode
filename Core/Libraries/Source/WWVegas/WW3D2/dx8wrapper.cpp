@@ -227,7 +227,7 @@ static bool FKK_Load_DXVK()
 		return false;
 	d3d8Path[MAX_PATH-1] = d3d9Path[MAX_PATH-1] = confPath[MAX_PATH-1] = '\0';
 
-	if (GetFileAttributesA(d3d8Path) == INVALID_FILE_ATTRIBUTES || GetFileAttributesA(d3d9Path) == INVALID_FILE_ATTRIBUTES)
+	if (GetFileAttributesA(d3d8Path) == (DWORD)-1 || GetFileAttributesA(d3d9Path) == (DWORD)-1)
 		return false;
 
 	SetEnvironmentVariableA("DXVK_CONFIG_FILE", confPath);
