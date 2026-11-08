@@ -436,7 +436,7 @@ GameSpyGameInfo::GameSpyGameInfo()
 		setSlotPointer(i, &m_GameSpySlot[i]);
 
 	UnsignedInt localIP;
-	if (GetLocalChatConnectionAddress("peerchat.gamespy.com", 6667, localIP))
+	if (GetLocalChatConnectionAddress("generals.kewekordes.com", 6667, localIP))
 	{
 		localIP = ntohl(localIP); // The IP returned from GetLocalChatConnectionAddress is in network byte order.
 		setLocalIP(localIP);

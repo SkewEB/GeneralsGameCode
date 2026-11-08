@@ -806,6 +806,51 @@ void MetaMap::generateMetaMap()
 	// but is not recommended, because it will cause key mapping conflicts with original game languages.
 
 	{
+		// FKK Edition: keyboard zoom on the numpad.
+		MetaMapRec *map = getMetaMapRec(GameMessage::MSG_META_BEGIN_CAMERA_ZOOM_IN);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_KPPLUS;
+			map->m_transition = DOWN;
+			map->m_modState = NONE;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+	}
+	{
+		// FKK Edition: keyboard zoom on the numpad.
+		MetaMapRec *map = getMetaMapRec(GameMessage::MSG_META_END_CAMERA_ZOOM_IN);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_KPPLUS;
+			map->m_transition = UP;
+			map->m_modState = NONE;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+	}
+	{
+		// FKK Edition: keyboard zoom on the numpad.
+		MetaMapRec *map = getMetaMapRec(GameMessage::MSG_META_BEGIN_CAMERA_ZOOM_OUT);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_KPMINUS;
+			map->m_transition = DOWN;
+			map->m_modState = NONE;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+	}
+	{
+		// FKK Edition: keyboard zoom on the numpad.
+		MetaMapRec *map = getMetaMapRec(GameMessage::MSG_META_END_CAMERA_ZOOM_OUT);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_KPMINUS;
+			map->m_transition = UP;
+			map->m_modState = NONE;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+	}
+
+	{
 		// Is useful for Generals and Zero Hour.
 		MetaMapRec *map = getMetaMapRec(GameMessage::MSG_META_INCREASE_MAX_RENDER_FPS);
 		if (map->m_key == MK_NONE)

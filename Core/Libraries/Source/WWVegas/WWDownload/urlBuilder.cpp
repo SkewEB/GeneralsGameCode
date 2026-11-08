@@ -31,11 +31,11 @@ void FormatURLFromRegistry( std::string& gamePatchURL, std::string& mapPatchURL,
 	std::string language = "english";
 	unsigned int version = 0; // invalid version - can't get on with a corrupt reg.
 	unsigned int mapVersion = 0; // invalid version - can't get on with a corrupt reg.
-	std::string baseURL = "http://servserv.generals.ea.com/servserv/";
+	std::string baseURL = "http://generals.kewekordes.com/servserv/"; // FKK Edition: private server
 	baseURL.append(sku);
 	baseURL.append("/");
 
-	GetStringFromRegistry("", "BaseURL", baseURL);
+	// FKK Edition: ignore the retail BaseURL registry value, it points at the dead EA server.
 	GetStringFromRegistry("", "Language", language);
 	GetUnsignedIntFromRegistry("", "Version", version);
 	GetUnsignedIntFromRegistry("", "MapPackVersion", mapVersion);

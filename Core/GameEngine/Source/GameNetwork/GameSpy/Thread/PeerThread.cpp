@@ -2295,7 +2295,7 @@ void PeerThreadClass::connectCallback( PEER peer, PEERBool success )
 	resp.peerResponseType = PeerResponse::PEERRESPONSE_LOGIN;
 	resp.player.profileID = m_profileID;
 	resp.nick = m_loginName;
-	GetLocalChatConnectionAddress("peerchat.gamespy.com", 6667, localIP);
+	GetLocalChatConnectionAddress("generals.kewekordes.com", 6667, localIP);
 	chatSetLocalIP(localIP);
 	resp.player.internalIP = ntohl(localIP);
 	resp.player.externalIP = ntohl(peerGetLocalIP(peer));

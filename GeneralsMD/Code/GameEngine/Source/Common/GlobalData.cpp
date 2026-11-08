@@ -1215,6 +1215,11 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_firewallPortAllocationDelta = optionPref.getFirewallPortAllocationDelta();
 	TheWritableGlobalData->m_firewallPortOverride = optionPref.getFirewallPortOverride();
 
+	// FKK Edition: allow zooming further out (retail ZH: 310). Client-side camera only,
+	// no effect on the game simulation. Clamped so repeated INI loads do not compound.
+	if (TheWritableGlobalData->m_maxCameraHeight < 500.0f)
+		TheWritableGlobalData->m_maxCameraHeight = 500.0f;
+
 	TheWritableGlobalData->m_saveCameraInReplay = optionPref.saveCameraInReplays();
 	TheWritableGlobalData->m_useCameraInReplay = optionPref.useCameraInReplays();
 	TheWritableGlobalData->m_enablePlayerObserver = optionPref.getPlayerObserverEnabled();

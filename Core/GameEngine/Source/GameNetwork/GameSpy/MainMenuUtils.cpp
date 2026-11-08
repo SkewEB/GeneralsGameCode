@@ -690,9 +690,9 @@ static GHTTPBool numPlayersOnlineCallback( GHTTPRequest request, GHTTPResult res
 void CheckOverallStats()
 {
 #if RTS_GENERALS
-	const char *const url = "http://gamestats.gamespy.com/ccgenerals/display.html";
+	const char *const url = "http://generals.kewekordes.com/ccgenerals/display.html";
 #elif RTS_ZEROHOUR
-	const char *const url = "http://gamestats.gamespy.com/ccgenzh/display.html";
+	const char *const url = "http://generals.kewekordes.com/ccgenzh/display.html";
 #endif
 	ghttpGet(url, GHTTPFalse, overallStatsCallback, nullptr);
 }
@@ -702,9 +702,9 @@ void CheckOverallStats()
 void CheckNumPlayersOnline()
 {
 #if RTS_GENERALS
-	const char *const url = "http://launch.gamespyarcade.com/software/launch/arcadecount2.dll?svcname=ccgenerals";
+	const char *const url = "http://generals.kewekordes.com/software/launch/arcadecount2.dll?svcname=ccgenerals";
 #elif RTS_ZEROHOUR
-	const char *const url = "http://launch.gamespyarcade.com/software/launch/arcadecount2.dll?svcname=ccgenzh";
+	const char *const url = "http://generals.kewekordes.com/software/launch/arcadecount2.dll?svcname=ccgenzh";
 #endif
 	ghttpGet(url, GHTTPFalse, numPlayersOnlineCallback, nullptr);
 }
@@ -774,7 +774,7 @@ void HTTPThinkWrapper()
 {
 	if (s_asyncDNSLookupInProgress)
 	{
-		Char hostname[] = "servserv.generals.ea.com";
+		Char hostname[] = "generals.kewekordes.com"; // FKK Edition: private server
 		Int ret = asyncGethostbyname(hostname);
 		switch(ret)
 		{
@@ -831,7 +831,7 @@ void StartPatchCheck()
 		TheGameText->fetch("GUI:CheckingForPatches"), CancelPatchCheckCallbackAndReopenDropdown);
 
 	s_asyncDNSLookupInProgress = TRUE;
-	Char hostname[] = "servserv.generals.ea.com";
+	Char hostname[] = "generals.kewekordes.com"; // FKK Edition: private server
 	Int ret = asyncGethostbyname(hostname);
 	switch(ret)
 	{
