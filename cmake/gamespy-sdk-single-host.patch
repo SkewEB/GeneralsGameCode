@@ -32,6 +32,28 @@ index 7b0039d..82dda00 100644
  #ifdef __cplusplus
  }
  #endif
+diff --git a/src/chat/chathandlers.c b/src/chat/chathandlers.c
+index 8b8c13d..46310c2 100644
+--- a/src/chat/chathandlers.c
++++ b/src/chat/chathandlers.c
+@@ -3130,6 +3130,8 @@ void ciRplGetCKeyHandler(CHAT chat, const ciServerMessage* message)
+ 
+             while (*flags) {
+                 key = strstr(flags, "b_");
++                if (!key) // FKK: an emulator may rebroadcast key lists without any b_ key
++                    break;
+                 flags = key;
+                 while (*flags && (*flags != '\\'))
+                     flags++;
+@@ -3344,6 +3346,8 @@ void ciRplGetChanKeyHandler(CHAT chat, const ciServerMessage* message)
+ 
+             while (*flags) {
+                 key = strstr(flags, "b_");
++                if (!key) // FKK: an emulator may rebroadcast key lists without any b_ key
++                    break;
+                 flags = key;
+                 while (*flags && (*flags != '\\'))
+                     flags++;
 diff --git a/src/common/gsavailable.c b/src/common/gsavailable.c
 index e614149..ab424a0 100644
 --- a/src/common/gsavailable.c
