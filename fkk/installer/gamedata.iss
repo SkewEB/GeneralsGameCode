@@ -11,10 +11,10 @@
 
 ; Optional HD texture pack (AI-upscaled unit/building textures, loose files in Art\Textures).
 ; Values come from FKK-HD-hochladen.ps1 (run once by Kewe). Empty hash = part not offered.
-#define HDSize          ""
+#define HDSize          "ca. 520 MB Download, 1,1 GB auf der Platte"
 #define HDFile1         "fkk-hd-1.zip"
-#define HDSHA1          ""
+#define HDSHA1          "3bf3fc14a6e57f59f87159f2e3572d5e81d4981c409775312761c0e8492bc7d2"
 #define HDFile2         "fkk-hd-2.zip"
-#define HDSHA2          ""
+#define HDSHA2          "f52df1284e8acbcf6fe0ad6b7d8d18638f4fb36af9bf3e2c71ca03050895105e"
 #define HDFile3         "fkk-hd-3.zip"
 #define HDSHA3          ""
