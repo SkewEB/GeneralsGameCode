@@ -73,7 +73,7 @@ jobs:
           $version = "0.1.${{ github.run_number }}"
           $tag = "fkk-v$version"
           New-Item -ItemType Directory -Force fkk\installer\output | Out-Null
-          Set-Content -NoNewline -Path fkk\installer\output\fkk-version.txt -Value "$tag-$shortSha"
+          Set-Content -NoNewline -Path fkk\installer\output\fkk-version.txt -Value "$shortSha"
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) {
             choco install innosetup -y --no-progress
