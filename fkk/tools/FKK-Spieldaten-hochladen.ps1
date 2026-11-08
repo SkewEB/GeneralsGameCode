@@ -42,17 +42,25 @@ $tar = "$env:WINDIR\System32\tar.exe"
 $results = @()
 foreach ($item in @(@{ Name = "fkk-zh.zip"; Dir = $zhDir }, @{ Name = "fkk-generals.zip"; Dir = $genDir })) {
     $zip = Join-Path $work $item.Name
-    if (Test-Path $zip) { Remove-Item $zip }
-    Write-Host "Packe $($item.Dir) -> $($item.Name) ..."
-    & $tar -a -c -f $zip @excludeArgs -C $item.Dir .
-    if ($LASTEXITCODE -ne 0) { throw "tar fehlgeschlagen fuer $($item.Name)" }
+    # Windows PowerShell wertet jede Ausgabe von tar/curl auf stderr (Fortschritt)
+    # sonst als Fehler; Erfolg pruefen wir ueber den Exit-Code.
+    $ErrorActionPreference = "Continue"
+    if (Test-Path $zip) {
+        Write-Host "$($item.Name) ist schon gepackt, nehme das vorhandene Archiv."
+    } else {
+        Write-Host "Packe $($item.Dir) -> $($item.Name) ..."
+        & $tar -a -c -f "$zip.part" @excludeArgs -C $item.Dir .
+        if ($LASTEXITCODE -ne 0) { throw "tar fehlgeschlagen fuer $($item.Name)" }
+        Move-Item "$zip.part" $zip
+    }
 
     $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLower()
     $size = (Get-Item $zip).Length
 
     Write-Host "Lade $($item.Name) hoch ($([math]::Round($size / 1MB)) MB) ..."
     & curl.exe --fail --show-error --progress-bar -u "upload:$uploadPw" -T $zip "$UploadUrl$($item.Name)"
-    if ($LASTEXITCODE -ne 0) { throw "Upload fehlgeschlagen fuer $($item.Name)" }
+    if ($LASTEXITCODE -ne 0) { throw "Upload fehlgeschlagen fuer $($item.Name) (curl Code $LASTEXITCODE)" }
+    $ErrorActionPreference = "Stop"
 
     $results += "$($item.Name) $hash $size"
 }
