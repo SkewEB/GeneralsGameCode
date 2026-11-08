@@ -17,10 +17,9 @@ function Get-RegValue($path, $name) {
 $zhKey  = "HKLM:\SOFTWARE\WOW6432Node\Electronic Arts\EA Games\Command and Conquer Generals Zero Hour"
 $genKey = "HKLM:\SOFTWARE\WOW6432Node\Electronic Arts\EA Games\Generals"
 
-$zhDir  = Get-RegValue $zhKey "InstallPath"
-$genDir = Get-RegValue $genKey "InstallPath"
-if (-not $zhDir  -or -not (Test-Path (Join-Path $zhDir "INIZH.big"))) { $zhDir  = Read-Host "Zero-Hour-Ordner (mit INIZH.big)" }
-if (-not $genDir -or -not (Test-Path (Join-Path $genDir "INI.big")))  { $genDir = Read-Host "Generals-Ordner (mit INI.big)" }
+# Kewes Installation (EA App), fest eingetragen
+$zhDir  = "C:\Program Files\EA Games\Command and Conquer Generals Zero Hour\Command and Conquer Generals Zero Hour"
+$genDir = "C:\Program Files\EA Games\Command and Conquer Generals Zero Hour\Command and Conquer Generals"
 if (-not (Test-Path (Join-Path $zhDir "INIZH.big"))) { throw "INIZH.big nicht gefunden in $zhDir" }
 if (-not (Test-Path (Join-Path $genDir "INI.big")))  { throw "INI.big nicht gefunden in $genDir" }
 
