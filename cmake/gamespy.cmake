@@ -11,7 +11,7 @@ FetchContent_Declare(
     gamespy
     GIT_REPOSITORY https://github.com/TheSuperHackers/GamespySDK.git
     GIT_TAG        07e3d15c500415abc281efb74322ab6d9c857eb8
-    PATCH_COMMAND  ${GIT_EXECUTABLE} apply --whitespace=nowarn ${CMAKE_CURRENT_LIST_DIR}/patches/gamespy-sdk-single-host.patch
+    PATCH_COMMAND  ${GIT_EXECUTABLE} apply --whitespace=nowarn ${CMAKE_CURRENT_LIST_DIR}/gamespy-sdk-single-host.patch
     UPDATE_DISCONNECTED TRUE
 )
 
