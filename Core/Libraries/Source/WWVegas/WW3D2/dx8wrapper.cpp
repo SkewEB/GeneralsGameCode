@@ -184,6 +184,68 @@ typedef IDirect3D8* (WINAPI *Direct3DCreate8Type) (UINT SDKVersion);
 Direct3DCreate8Type	Direct3DCreate8Ptr = nullptr;
 HINSTANCE D3D8Lib = nullptr;
 
+// FKK Edition: the installer ships DXVK (Direct3D 8/9 on Vulkan, zlib licence) in the
+// sub folder fkk-dxvk next to the game exe. It renders the same frames through a modern
+// Vulkan driver (smoother on current GPUs). Rendering only, no effect on the game logic.
+// Falls back to the system Direct3D 8 when the folder is missing, the PC has no usable
+// Vulkan driver or the game was started with -nodxvk.
+static HINSTANCE FKKDxvkD3D9Lib = nullptr;
+
+static void FKK_Unload_DXVK()
+{
+	if (D3D8Lib) {
+		FreeLibrary(D3D8Lib);
+		D3D8Lib = nullptr;
+	}
+	if (FKKDxvkD3D9Lib) {
+		FreeLibrary(FKKDxvkD3D9Lib);
+		FKKDxvkD3D9Lib = nullptr;
+	}
+}
+
+static bool FKK_Load_DXVK()
+{
+	const char *cmdLine = GetCommandLineA();
+	if (cmdLine && strstr(cmdLine, "-nodxvk"))
+		return false;
+
+	char dir[MAX_PATH];
+	DWORD len = GetModuleFileNameA(nullptr, dir, MAX_PATH);
+	if (len == 0 || len >= MAX_PATH)
+		return false;
+	char *slash = strrchr(dir, '\\');
+	if (slash == nullptr)
+		return false;
+	slash[1] = '\0';
+
+	char d3d8Path[MAX_PATH];
+	char d3d9Path[MAX_PATH];
+	char confPath[MAX_PATH];
+	if (_snprintf(d3d8Path, MAX_PATH, "%sfkk-dxvk\\d3d8.dll", dir) < 0
+		|| _snprintf(d3d9Path, MAX_PATH, "%sfkk-dxvk\\d3d9.dll", dir) < 0
+		|| _snprintf(confPath, MAX_PATH, "%sfkk-dxvk\\dxvk.conf", dir) < 0)
+		return false;
+	d3d8Path[MAX_PATH-1] = d3d9Path[MAX_PATH-1] = confPath[MAX_PATH-1] = '\0';
+
+	if (GetFileAttributesA(d3d8Path) == INVALID_FILE_ATTRIBUTES || GetFileAttributesA(d3d9Path) == INVALID_FILE_ATTRIBUTES)
+		return false;
+
+	SetEnvironmentVariableA("DXVK_CONFIG_FILE", confPath);
+	SetEnvironmentVariableA("DXVK_LOG_LEVEL", "none");
+	SetEnvironmentVariableA("DXVK_STATE_CACHE", "0");
+
+	// DXVK's d3d8.dll imports d3d9.dll and needs DXVK's own one, so load that first by full path.
+	FKKDxvkD3D9Lib = LoadLibraryExA(d3d9Path, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+	if (FKKDxvkD3D9Lib == nullptr)
+		return false;
+	D3D8Lib = LoadLibraryExA(d3d8Path, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+	if (D3D8Lib == nullptr) {
+		FKK_Unload_DXVK();
+		return false;
+	}
+	return true;
+}
+
 DX8_CleanupHook	 *DX8Wrapper::m_pCleanupHook=nullptr;
 #ifdef EXTENDED_STATS
 DX8_Stats	 DX8Wrapper::stats;
@@ -314,27 +376,49 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 	Invalidate_Cached_Render_States();
 
 	if (!lite) {
-		D3D8Lib = LoadLibrary("D3D8.DLL");
-
-		if (D3D8Lib == nullptr) return false;	// Return false at this point if init failed
-
-		Direct3DCreate8Ptr = (Direct3DCreate8Type) GetProcAddress(D3D8Lib, "Direct3DCreate8");
-		if (Direct3DCreate8Ptr == nullptr)
-		{
-			Shutdown();
-			return false;
+		// FKK Edition: try DXVK first, see FKK_Load_DXVK
+		if (FKK_Load_DXVK()) {
+			Direct3DCreate8Ptr = (Direct3DCreate8Type) GetProcAddress(D3D8Lib, "Direct3DCreate8");
+			if (Direct3DCreate8Ptr != nullptr) {
+				WWDEBUG_SAY(("Create Direct3D8 (DXVK)"));
+				DbgHelpGuard dbgHelpGuard;
+				D3DInterface = Direct3DCreate8Ptr(D3D_SDK_VERSION);
+			}
+			// no Vulkan driver or no usable GPU: DXVK reports no adapter
+			if (D3DInterface != nullptr && D3DInterface->GetAdapterCount() == 0) {
+				D3DInterface->Release();
+				D3DInterface = nullptr;
+			}
+			if (D3DInterface == nullptr) {
+				WWDEBUG_SAY(("DXVK not usable, falling back to system Direct3D 8"));
+				Direct3DCreate8Ptr = nullptr;
+				FKK_Unload_DXVK();
+			}
 		}
 
-		/*
-		** Create the D3D interface object
-		*/
-		WWDEBUG_SAY(("Create Direct3D8"));
-		{
-			// TheSuperHackers @bugfix xezon 13/06/2025 Front load the system dbghelp.dll to prevent
-			// the graphics driver from potentially loading the old game dbghelp.dll and then crashing the game process.
-			DbgHelpGuard dbgHelpGuard;
+		if (D3DInterface == nullptr) {
+			D3D8Lib = LoadLibrary("D3D8.DLL");
 
-			D3DInterface = Direct3DCreate8Ptr(D3D_SDK_VERSION);		// TODO: handle failure cases...
+			if (D3D8Lib == nullptr) return false;	// Return false at this point if init failed
+
+			Direct3DCreate8Ptr = (Direct3DCreate8Type) GetProcAddress(D3D8Lib, "Direct3DCreate8");
+			if (Direct3DCreate8Ptr == nullptr)
+			{
+				Shutdown();
+				return false;
+			}
+
+			/*
+			** Create the D3D interface object
+			*/
+			WWDEBUG_SAY(("Create Direct3D8"));
+			{
+				// TheSuperHackers @bugfix xezon 13/06/2025 Front load the system dbghelp.dll to prevent
+				// the graphics driver from potentially loading the old game dbghelp.dll and then crashing the game process.
+				DbgHelpGuard dbgHelpGuard;
+
+				D3DInterface = Direct3DCreate8Ptr(D3D_SDK_VERSION);		// TODO: handle failure cases...
+			}
 		}
 		if (D3DInterface == nullptr) {
 			Shutdown();
@@ -376,10 +460,7 @@ void DX8Wrapper::Shutdown()
 		}
 	}
 
-	if (D3D8Lib) {
-		FreeLibrary(D3D8Lib);
-		D3D8Lib = nullptr;
-	}
+	FKK_Unload_DXVK();
 
 	_RenderDeviceNameTable.Clear();		 // note - Delete_All() resizes the vector, causing a reallocation.  Clear is better. jba.
 	_RenderDeviceShortNameTable.Clear();

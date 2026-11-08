@@ -38,6 +38,9 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/BuildVersion.h
 
 if(MSVC)
     target_link_options(z_generals PRIVATE "/NODEFAULTLIB:libci.lib")
+    # FKK Edition: allow up to 4 GB address space on 64-bit Windows (high resolution,
+    # anti-aliasing and the DXVK renderer need more than the default 2 GB of a 32-bit game)
+    target_link_options(z_generals PRIVATE "/LARGEADDRESSAWARE")
 endif()
 
 target_include_directories(z_generals PRIVATE

@@ -1172,6 +1172,58 @@ void GlobalData::reset()
 }
 
 //-------------------------------------------------------------------------------------------------
+// FKK Edition: the retail detection rates every current PC as "low end" (it only knows CPUs and
+// graphics chips up to 2003) and starts in 800x600. Once per player (marker FKKGraphics in
+// Options.ini) switch to the highest detail level, 4x anti-aliasing, 16x anisotropic texture
+// filtering and, when no resolution was chosen yet, the desktop resolution (at most 2560x1440,
+// above that the menus get too small). Everything stays changeable in the options menu.
+// Client-side rendering settings only: no effect on the game logic, mixed settings stay in sync.
+//-------------------------------------------------------------------------------------------------
+static void applyFKKGraphicsDefaults()
+{
+	static Bool s_done = FALSE;
+	if (s_done)
+		return;
+	s_done = TRUE;
+
+	if (TheGlobalData && TheGlobalData->m_headless)
+		return;
+
+	OptionPreferences optionPref;
+	if (optionPref["FKKGraphics"] == "1")
+		return;
+
+	optionPref["StaticGameLOD"] = "VeryHigh";
+	optionPref["IdealStaticGameLOD"] = "VeryHigh";
+	optionPref["AntiAliasing"] = "4";
+	optionPref["TextureFilter"] = "Anisotropic";
+	optionPref["AnisotropyLevel"] = "16";
+
+	if (optionPref.find("Resolution") == optionPref.end())
+	{
+		DEVMODEA mode;
+		memset(&mode, 0, sizeof(mode));
+		mode.dmSize = sizeof(mode);
+		if (EnumDisplaySettingsA(nullptr, ENUM_CURRENT_SETTINGS, &mode) && mode.dmPelsWidth >= 1024 && mode.dmPelsHeight >= 768)
+		{
+			Int xres = (Int)mode.dmPelsWidth;
+			Int yres = (Int)mode.dmPelsHeight;
+			if (xres > 2560 && xres * 9 == yres * 16)
+			{
+				xres = 2560;
+				yres = 1440;
+			}
+			AsciiString res;
+			res.format("%d %d", xres, yres);
+			optionPref["Resolution"] = res;
+		}
+	}
+
+	optionPref["FKKGraphics"] = "1";
+	optionPref.write();
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Parse GameData entry */
 //-------------------------------------------------------------------------------------------------
 void GlobalData::parseGameDataDefinition( INI* ini )
@@ -1199,6 +1251,9 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	// parse the ini weapon definition
 	ini->initFromINI( TheWritableGlobalData, s_GlobalDataFieldParseTable );
 
+
+	// FKK Edition: once per player, switch the graphics options to maximum (see below)
+	applyFKKGraphicsDefaults();
 
 	// override INI values with user preferences
 	OptionPreferences optionPref;
