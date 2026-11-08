@@ -113,22 +113,24 @@ private:
 
 static AsciiString obfuscate( AsciiString in )
 {
-	char *buf = NEW char[in.getLength() + 1];
-	strcpy(buf, in.str());
+	// FKK: rewritten without the undefined "*c = *c++ ^ *c2++" of the original. With the C++17
+	// evaluation order that statement stores into the *next* byte, overwrites the terminator and
+	// then runs off the end of the buffer: heap corruption as soon as a password is saved or loaded.
 	static const char *xorWord = "1337Munkee";
-	char *c = buf;
+	AsciiString out;
+	const char *c = in.str();
 	const char *c2 = xorWord;
 	while (*c)
 	{
 		if (!*c2)
 			c2 = xorWord;
 		if (*c != *c2)
-			*c = *c++ ^ *c2++;
+			out.concat((char)(*c ^ *c2));
 		else
-			c++, c2++;
+			out.concat(*c);
+		++c;
+		++c2;
 	}
-	AsciiString out = buf;
-	delete[] buf;
 	return out;
 }
 
