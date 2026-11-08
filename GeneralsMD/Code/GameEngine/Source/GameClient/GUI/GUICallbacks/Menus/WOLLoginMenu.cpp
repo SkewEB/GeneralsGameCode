@@ -310,6 +310,40 @@ AsciiStringList GameSpyLoginPreferences::getEmails()
 
 static GameSpyLoginPreferences *loginPref = nullptr;
 
+// FKK Edition: name + password are enough. E-mail and birth date are optional;
+// if left empty they are derived, and the server creates the account on first use.
+// With saved login data the screen logs in by itself.
+static Bool fkkAutoLoginPending = FALSE;
+
+static AsciiString fkkEmailForNick( const AsciiString& nick )
+{
+	AsciiString email;
+	for (Int i = 0; i < nick.getLength(); ++i)
+	{
+		char c = nick.getCharAt(i);
+		if (c >= 'A' && c <= 'Z')
+			c = c - 'A' + 'a';
+		if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.')
+			email.concat(c);
+	}
+	if (email.isEmpty())
+		email = "spieler";
+	email.concat("@fkk.local");
+	return email;
+}
+
+static void fkkFillOptionalFields( AsciiString& email, AsciiString& month, AsciiString& day, AsciiString& year, const AsciiString& login )
+{
+	if (email.isEmpty() && !login.isEmpty())
+		email = fkkEmailForNick(login);
+	if (month.isEmpty() || day.isEmpty() || year.isEmpty())
+	{
+		month = "1";
+		day = "1";
+		year = "1990";
+	}
+}
+
 static void startPings()
 {
 	std::list<AsciiString> pingServers = TheGameSpyConfig->getPingServers();
@@ -679,11 +713,11 @@ void WOLLoginMenuInit( WindowLayout *layout, void *userData )
 			GadgetComboBoxSetSelectedPos(comboBoxLoginName, selectedPos);
 			markCheckBox = TRUE;
 		}
-		// always start with not storing information
-		if( markCheckBox)
-			GadgetCheckBoxSetChecked(checkBoxRememberPassword, TRUE);
-		else
-			GadgetCheckBoxSetChecked(checkBoxRememberPassword, FALSE);
+		// FKK: remember login data by default, and log in by itself if we have it
+		GadgetCheckBoxSetChecked(checkBoxRememberPassword, TRUE);
+		fkkAutoLoginPending = markCheckBox
+			&& !GadgetComboBoxGetText(comboBoxLoginName).isEmpty()
+			&& !GadgetTextEntryGetText(textEntryPassword).isEmpty();
 #ifdef ALLOW_NON_PROFILED_LOGIN
 	}
 	else
@@ -719,7 +753,7 @@ void WOLLoginMenuInit( WindowLayout *layout, void *userData )
 	RaiseGSMessageBox();
 
 	OptionPreferences optionPref;
-	if (!optionPref.getBool("SawTOS", TRUE))
+	if (FALSE && !optionPref.getBool("SawTOS", TRUE)) // FKK: no GameSpy terms of service on our server
 	{
 		TheWindowManager->winSendSystemMsg( parentWOLLogin, GBM_SELECTED,
 																			(WindowMsgData)buttonTOS, buttonTOSID );
@@ -806,6 +840,12 @@ static void checkLogin()
 //-------------------------------------------------------------------------------------------------
 void WOLLoginMenuUpdate( WindowLayout * layout, void *userData)
 {
+	if (fkkAutoLoginPending && !isShuttingDown && !buttonPushed && loginAttemptTime == 0
+		&& TheShell->isAnimFinished() && parentWOLLogin && buttonLogin)
+	{
+		fkkAutoLoginPending = FALSE;
+		TheWindowManager->winSendSystemMsg( parentWOLLogin, GBM_SELECTED, (WindowMsgData)buttonLogin, buttonLoginID );
+	}
 
 	// We'll only be successful if we've requested to
 	if(isShuttingDown && TheShell->isAnimFinished() && TheTransitionHandler->isFinished())
@@ -1244,16 +1284,19 @@ WindowMsgHandledType WOLLoginMenuSystem( GameWindow *window, UnsignedInt msg,
 						day.translate( GadgetTextEntryGetText(textEntryDay) );
 						year.translate( GadgetTextEntryGetText(textEntryYear) );
 
+						AsciiString login, password, email;
+						email.translate( GadgetComboBoxGetText(comboBoxEmail) );
+						login.translate( GadgetComboBoxGetText(comboBoxLoginName) );
+						password.translate( GadgetTextEntryGetText(textEntryPassword) );
+						email.trim();
+						login.trim();
+						fkkFillOptionalFields(email, month, day, year, login);
+
 						if(!isAgeOkay(month, day, year))
 						{
 							GSMessageBoxOk(TheGameText->fetch("GUI:AgeFailedTitle"), TheGameText->fetch("GUI:AgeFailed"));
 							break;
 						}
-
-						AsciiString login, password, email;
-						email.translate( GadgetComboBoxGetText(comboBoxEmail) );
-						login.translate( GadgetComboBoxGetText(comboBoxLoginName) );
-						password.translate( GadgetTextEntryGetText(textEntryPassword) );
 
 						if ( !email.isEmpty() && !login.isEmpty() && !password.isEmpty() )
 						{
@@ -1334,21 +1377,26 @@ WindowMsgHandledType WOLLoginMenuSystem( GameWindow *window, UnsignedInt msg,
 						day.translate( GadgetTextEntryGetText(textEntryDay) );
 						year.translate( GadgetTextEntryGetText(textEntryYear) );
 
+						email.translate( GadgetComboBoxGetText(comboBoxEmail) );
+						login.translate( GadgetComboBoxGetText(comboBoxLoginName) );
+						password.translate( GadgetTextEntryGetText(textEntryPassword) );
+						email.trim();
+						login.trim();
+						fkkFillOptionalFields(email, month, day, year, login);
+
 						if(!isAgeOkay(month, day, year))
 						{
 							GSMessageBoxOk(TheGameText->fetch("GUI:AgeFailedTitle"), TheGameText->fetch("GUI:AgeFailed"));
 							break;
 						}
 
-						email.translate( GadgetComboBoxGetText(comboBoxEmail) );
-						login.translate( GadgetComboBoxGetText(comboBoxLoginName) );
-						password.translate( GadgetTextEntryGetText(textEntryPassword) );
-
 						if ( !email.isEmpty() && !login.isEmpty() && !password.isEmpty() )
 						{
 							loginAttemptTime = timeGetTime();
 							BuddyRequest req;
-							req.buddyRequestType = BuddyRequest::BUDDYREQUEST_LOGIN;
+							// FKK: "newuser" on our server logs in an existing account (same name and
+							// password) or creates it, so one button covers both cases.
+							req.buddyRequestType = BuddyRequest::BUDDYREQUEST_LOGINNEW;
 							strlcpy(req.arg.login.nick, login.str(), ARRAY_SIZE(req.arg.login.nick));
 							strlcpy(req.arg.login.email, email.str(), ARRAY_SIZE(req.arg.login.email));
 							strlcpy(req.arg.login.password, password.str(), ARRAY_SIZE(req.arg.login.password));
