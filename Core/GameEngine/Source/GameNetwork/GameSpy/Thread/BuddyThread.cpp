@@ -265,7 +265,12 @@ void BuddyThreadClass::Thread_Function()
 #elif RTS_ZEROHOUR
 	const int productID = 823;
 #endif
-	gpInitialize( con, productID, 0, GP_PARTNERID_GAMESPY );
+	if ( gpInitialize( con, productID, 0, GP_PARTNERID_GAMESPY ) != GP_NO_ERROR )
+	{
+		// FKK: gpInitialize failed, gpCon is uninitialized. Don't touch it.
+		DEBUG_LOG(("BuddyThread: gpInitialize failed"));
+		return;
+	}
 	m_isConnected = m_isConnecting = false;
 
 	gpSetCallback( con, GP_ERROR,								callbackWrapper,	(void *)CALLBACK_ERROR );

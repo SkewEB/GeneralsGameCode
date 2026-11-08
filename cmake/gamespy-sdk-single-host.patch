@@ -32,6 +32,24 @@ index 7b0039d..82dda00 100644
  #ifdef __cplusplus
  }
  #endif
+diff --git a/src/common/gsavailable.c b/src/common/gsavailable.c
+index e614149..ab424a0 100644
+--- a/src/common/gsavailable.c
++++ b/src/common/gsavailable.c
+@@ -8,7 +8,13 @@
+ 
+ // this is the global var that the SDKs check
+ // to see if they should communicate with the backend
++#ifdef GSI_SINGLE_HOST
++// Private single-host server: always available, the retail availability
++// check is never started by the game and would otherwise block gpInitialize.
++GSIACResult __GSIACResult = GSIACAvailable;
++#else
+ GSIACResult __GSIACResult = GSIACWaiting;
++#endif
+ 
+ // this makes the gamename available to all of the SDKs
+ char __GSIACGamename[64] = {0};
 diff --git a/src/common/gsplatformsocket.c b/src/common/gsplatformsocket.c
 index 2239795..695f988 100644
 --- a/src/common/gsplatformsocket.c
