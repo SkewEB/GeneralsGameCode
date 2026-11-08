@@ -8,3 +8,13 @@
 #define GenDataSHA256   "b0be0554549a5a8c1b27f11da880c02984a30c6d751e710b4813c3b3b1e67cde"
 #define DataLanguage    "german"
 #define DataVersion     "65540"
+
+; Optional HD texture pack (AI-upscaled unit/building textures, loose files in Art\Textures).
+; Values come from FKK-HD-hochladen.ps1 (run once by Kewe). Empty hash = part not offered.
+#define HDSize          ""
+#define HDFile1         "fkk-hd-1.zip"
+#define HDSHA1          ""
+#define HDFile2         "fkk-hd-2.zip"
+#define HDSHA2          ""
+#define HDFile3         "fkk-hd-3.zip"
+#define HDSHA3          ""
