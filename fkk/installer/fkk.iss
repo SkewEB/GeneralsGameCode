@@ -14,7 +14,7 @@
 
 [Setup]
 AppId={{6F0B4C1E-6A43-4C1B-9B7A-FKK0EDITION01}
-AppName=C&C Generals Zero Hour - FKK Edition
+AppName=Generals FKK Edition (Fliesen Kalisch Killer Edition)
 AppVersion={#AppVersion}
 AppPublisher=Fliesen Kalisch Killer
 AppPublisherURL=http://generals.kewekordes.com
@@ -52,8 +52,13 @@ Source: "fkk.ico"; DestDir: "{app}"; DestName: "fkk.ico"; Flags: ignoreversion
 Source: "output\fkk-version.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autodesktop}\Generals ZH FKK Edition"; Filename: "{app}\FKK-Starter.exe"; WorkingDir: "{app}"; IconFilename: "{app}\fkk.ico"
-Name: "{autoprograms}\Generals ZH FKK Edition"; Filename: "{app}\FKK-Starter.exe"; WorkingDir: "{app}"; IconFilename: "{app}\fkk.ico"
+Name: "{autodesktop}\Generals FKK Edition"; Filename: "{app}\FKK-Starter.exe"; WorkingDir: "{app}"; IconFilename: "{app}\fkk.ico"
+Name: "{autoprograms}\Generals FKK Edition"; Filename: "{app}\FKK-Starter.exe"; WorkingDir: "{app}"; IconFilename: "{app}\fkk.ico"
+
+[InstallDelete]
+; shortcut name of v0.1.1
+Type: files; Name: "{autodesktop}\Generals ZH FKK Edition.lnk"
+Type: files; Name: "{autoprograms}\Generals ZH FKK Edition.lnk"
 
 [Run]
 ; after a silent auto-update: start the game again as the normal user

@@ -24,11 +24,15 @@ static class FKKStarter
 		string dir = AppDomain.CurrentDomain.BaseDirectory;
 		bool skipUpdate = Array.IndexOf(args, "-noupdate") >= 0;
 
+		Application.EnableVisualStyles();
+		Form splash = ShowSplash();
+		DateTime splashUntil = DateTime.Now.AddSeconds(2.5);
+
 		if (!skipUpdate)
 		{
 			try
 			{
-				if (TryUpdate(dir))
+				if (TryUpdate(dir, splash))
 					return 0; // setup takes over and restarts the starter afterwards
 			}
 			catch (Exception)
@@ -36,6 +40,13 @@ static class FKKStarter
 				// offline or server unreachable: just start the installed version
 			}
 		}
+
+		while (splash.Visible && DateTime.Now < splashUntil)
+		{
+			Application.DoEvents();
+			Thread.Sleep(30);
+		}
+		splash.Close();
 
 		string game = Path.Combine(dir, GameExe);
 		if (!File.Exists(game))
@@ -54,7 +65,51 @@ static class FKKStarter
 		return 0;
 	}
 
-	static bool TryUpdate(string dir)
+	static Form ShowSplash()
+	{
+		Form f = new Form();
+		f.FormBorderStyle = FormBorderStyle.None;
+		f.StartPosition = FormStartPosition.CenterScreen;
+		f.BackColor = Color.FromArgb(30, 33, 32);
+		f.ClientSize = new Size(520, 300);
+		f.ShowInTaskbar = true;
+		f.Text = "Generals FKK Edition";
+		f.TopMost = true;
+
+		Stream logoStream = typeof(FKKStarter).Assembly.GetManifestResourceStream("fkk-logo.png");
+		if (logoStream != null)
+		{
+			PictureBox pic = new PictureBox();
+			pic.Image = Image.FromStream(logoStream);
+			pic.SizeMode = PictureBoxSizeMode.Zoom;
+			pic.BackColor = Color.Transparent;
+			pic.SetBounds(60, 24, 400, 162);
+			f.Controls.Add(pic);
+		}
+
+		Label title = new Label();
+		title.Text = "Fliesen Kalisch Killer Edition";
+		title.ForeColor = Color.FromArgb(230, 40, 40);
+		title.Font = new Font("Segoe UI", 20f, FontStyle.Bold);
+		title.TextAlign = ContentAlignment.MiddleCenter;
+		title.SetBounds(0, 196, 520, 44);
+		f.Controls.Add(title);
+
+		Label sub = new Label();
+		sub.Text = "Command & Conquer Generals Zero Hour";
+		sub.ForeColor = Color.FromArgb(200, 200, 200);
+		sub.Font = new Font("Segoe UI", 11f);
+		sub.TextAlign = ContentAlignment.MiddleCenter;
+		sub.SetBounds(0, 242, 520, 26);
+		f.Controls.Add(sub);
+
+		f.Show();
+		f.Refresh();
+		Application.DoEvents();
+		return f;
+	}
+
+	static bool TryUpdate(string dir, Form splash)
 	{
 		ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // TLS 1.2
 
@@ -71,6 +126,7 @@ static class FKKStarter
 			return false;
 
 		string setup = Path.Combine(Path.GetTempPath(), "FKK-Setup-" + remote + ".exe");
+		splash.Hide();
 
 		Form form = new Form();
 		form.Text = "FKK Edition";
@@ -94,11 +150,13 @@ static class FKKStarter
 		dl.DownloadFileCompleted += delegate(object s, System.ComponentModel.AsyncCompletedEventArgs e) { error = e.Error; done = true; form.Close(); };
 		form.Shown += delegate { dl.DownloadFileAsync(new Uri(ReleaseBase + SetupFile), setup); };
 		form.FormClosing += delegate(object s, FormClosingEventArgs e) { if (!done) dl.CancelAsync(); };
-		Application.EnableVisualStyles();
 		Application.Run(form);
 
 		if (!done || error != null || !File.Exists(setup))
+		{
+			splash.Show();
 			return false; // cancelled or failed: start the old version
+		}
 
 		var psi = new ProcessStartInfo(setup);
 		psi.Arguments = "/SILENT /SUPPRESSMSGBOXES /NORESTART /FKKUPDATE=1";
@@ -110,6 +168,7 @@ static class FKKStarter
 		}
 		catch (System.ComponentModel.Win32Exception)
 		{
+			splash.Show();
 			return false; // admin prompt declined
 		}
 		return true;

@@ -1205,6 +1205,11 @@ void PeerThreadClass::Thread_Function()
 
 	peer = peerInitialize( &callbacks );
 	DEBUG_ASSERTCRASH( peer != nullptr, ("null peer!") );
+	if ( peer == nullptr )
+	{
+		// FKK: peerInitialize failed, every peer call below would dereference null.
+		return;
+	}
 	m_isConnected = m_isConnecting = false;
 
 	qr2_register_key(EXECRC_KEY, EXECRC_STR);
