@@ -51,11 +51,19 @@ Source: "{#GameDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourced
 Source: "{#StarterExe}"; DestDir: "{app}"; DestName: "FKK-Starter.exe"; Flags: ignoreversion
 Source: "FKKLogo.tga"; DestDir: "{app}\Art\Textures"; Flags: ignoreversion
 Source: "fkk.ico"; DestDir: "{app}"; DestName: "fkk.ico"; Flags: ignoreversion
+; DXVK renderer, loaded by the game from this folder (see dx8wrapper.cpp FKK_Load_DXVK)
+Source: "dxvk\d3d8.dll"; DestDir: "{app}\fkk-dxvk"; Flags: ignoreversion
+Source: "dxvk\d3d9.dll"; DestDir: "{app}\fkk-dxvk"; Flags: ignoreversion
+Source: "dxvk\dxvk.conf"; DestDir: "{app}\fkk-dxvk"; Flags: ignoreversion
+Source: "dxvk\LICENSE.txt"; DestDir: "{app}\fkk-dxvk"; Flags: ignoreversion
+Source: "dxvk\README.txt"; DestDir: "{app}\fkk-dxvk"; Flags: ignoreversion
 Source: "output\fkk-version.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autodesktop}\Generals FKK Edition"; Filename: "{app}\FKK-Starter.exe"; WorkingDir: "{app}"; IconFilename: "{app}\fkk.ico"
 Name: "{autoprograms}\Generals FKK Edition"; Filename: "{app}\FKK-Starter.exe"; WorkingDir: "{app}"; IconFilename: "{app}\fkk.ico"
+; fallback if the DXVK renderer causes trouble on a PC
+Name: "{autoprograms}\Generals FKK Edition (ohne DXVK)"; Filename: "{app}\FKK-Starter.exe"; Parameters: "-nodxvk"; WorkingDir: "{app}"; IconFilename: "{app}\fkk.ico"
 
 [Registry]
 ; only for installs from the private game-data download (no EA/Steam install present)
