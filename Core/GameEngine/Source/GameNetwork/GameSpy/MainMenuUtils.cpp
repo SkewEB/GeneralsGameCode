@@ -317,9 +317,15 @@ static GHTTPBool motdCallback( GHTTPRequest request, GHTTPResult result,
 	}
 
 	delete[] MOTDBuffer;
-	MOTDBuffer = NEW char[bufferLen];
-	memcpy(MOTDBuffer, buffer, bufferLen);
-	MOTDBuffer[bufferLen-1] = 0;
+	MOTDBuffer = nullptr;
+	// FKK: a failed or empty answer (e.g. no MOTD file for this language on the server)
+	// must not be copied into a zero-length buffer; SetUpGameSpy() accepts a null MOTD.
+	if (result == GHTTPSuccess && buffer != nullptr && bufferLen > 0)
+	{
+		MOTDBuffer = NEW char[bufferLen + 1];
+		memcpy(MOTDBuffer, buffer, bufferLen);
+		MOTDBuffer[bufferLen] = 0;
+	}
 
 	--checksLeftBeforeOnline;
 	DEBUG_ASSERTCRASH(checksLeftBeforeOnline>=0, ("Too many callbacks"));
@@ -372,9 +378,9 @@ static GHTTPBool configCallback( GHTTPRequest request, GHTTPResult result,
 		return GHTTPTrue;
 	}
 
-	configBuffer = NEW char[bufferLen];
+	configBuffer = NEW char[bufferLen + 1];
 	memcpy(configBuffer, buffer, bufferLen);
-	configBuffer[bufferLen-1] = 0;
+	configBuffer[bufferLen] = 0;
 
 	AsciiString fname;
 	fname.format("%sGeneralsOnline\\Config.txt", TheGlobalData->getPath_UserData().str());
@@ -441,7 +447,7 @@ static GHTTPBool configHeadCallback( GHTTPRequest request, GHTTPResult result,
 					fclose(fp);
 				}
 
-				if (serverLen == fileLen)
+				if (fileLen > 0 && serverLen == fileLen) // FKK: an empty or missing cache file is no match
 				{
 					// we don't need to download the MOTD again
 					--checksLeftBeforeOnline;
@@ -460,9 +466,9 @@ static GHTTPBool configHeadCallback( GHTTPRequest request, GHTTPResult result,
 					FILE *fp = fopen(fname.str(), "rb");
 					if (fp)
 					{
-						configBuffer = NEW char[fileLen];
+						configBuffer = NEW char[fileLen + 1];
 						fread(configBuffer, fileLen, 1, fp);
-						configBuffer[fileLen-1] = 0;
+						configBuffer[fileLen] = 0;
 						fclose(fp);
 
 						DEBUG_LOG(("Got Config before going online"));
@@ -771,7 +777,7 @@ void HTTPThinkWrapper()
 {
 	if (s_asyncDNSLookupInProgress)
 	{
-		Char hostname[] = "generals.kewekordes.com"; // FKK Edition: private server
+		static Char hostname[] = "generals.kewekordes.com"; // FKK Edition: private server (static: the lookup thread reads it later)
 		Int ret = asyncGethostbyname(hostname);
 		switch(ret)
 		{
@@ -828,7 +834,7 @@ void StartPatchCheck()
 		TheGameText->fetch("GUI:CheckingForPatches"), CancelPatchCheckCallbackAndReopenDropdown);
 
 	s_asyncDNSLookupInProgress = TRUE;
-	Char hostname[] = "generals.kewekordes.com"; // FKK Edition: private server
+	static Char hostname[] = "generals.kewekordes.com"; // FKK Edition: private server (static: the lookup thread reads it later)
 	Int ret = asyncGethostbyname(hostname);
 	switch(ret)
 	{
