@@ -98,7 +98,46 @@ typedef struct tConnInfoStruct {
  * HISTORY:                                                                                    *
  *   10/27/00 3:24PM ST : Created                                                              *
  *=============================================================================================*/
+// FKK Edition: which local address do we use to reach the chat server?
+// The original implementation (kept below, unused) walks the TCP table through the
+// deprecated inetmib1/SNMP extension and hands a stack array to SnmpExtensionQuery,
+// which frees and reallocates it: heap corruption (0xc0000374) right after the
+// lobby login on current Windows. Ask the socket layer for the route instead.
 Bool GetLocalChatConnectionAddress(AsciiString serverName, UnsignedShort serverPort, UnsignedInt& localIP)
+{
+	struct hostent *host_info = gethostbyname(serverName.str());
+	if (host_info == nullptr || host_info->h_addr_list == nullptr || host_info->h_addr_list[0] == nullptr)
+		return false;
+
+	SOCKET sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (sock == INVALID_SOCKET)
+		return false;
+
+	struct sockaddr_in remote;
+	memset(&remote, 0, sizeof(remote));
+	remote.sin_family = AF_INET;
+	remote.sin_port = htons(serverPort ? serverPort : 6667);
+	memcpy(&remote.sin_addr, host_info->h_addr_list[0], 4);
+
+	Bool found = false;
+	// connect() on a UDP socket sends nothing, it only selects the route and local address
+	if (connect(sock, (struct sockaddr *)&remote, sizeof(remote)) == 0)
+	{
+		struct sockaddr_in local;
+		int localLen = sizeof(local);
+		if (getsockname(sock, (struct sockaddr *)&local, &localLen) == 0 && local.sin_addr.s_addr != 0)
+		{
+			localIP = local.sin_addr.s_addr; // network byte order, like the SNMP version
+			found = true;
+		}
+	}
+	closesocket(sock);
+
+	DEBUG_LOG(("GetLocalChatConnectionAddress: %s", found ? "found" : "not found"));
+	return found;
+}
+
+Bool GetLocalChatConnectionAddress_SNMP_Unused(AsciiString serverName, UnsignedShort serverPort, UnsignedInt& localIP)
 {
 	//return false;
 	/*
