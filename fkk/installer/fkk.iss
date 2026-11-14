@@ -87,11 +87,10 @@ Filename: "{app}\FKK-Starter.exe"; Parameters: "-noupdate"; WorkingDir: "{app}";
 
 [Code]
 var
-  DataPage: TInputQueryWizardPage;
+  DataPage: TInputOptionWizardPage;
   DownloadPage: TDownloadWizardPage;
   DataDownload: Boolean;
-  HDPage: TInputQueryWizardPage;
-  HDCheck: TNewCheckBox;
+  HDPage: TInputOptionWizardPage;
   HDDownload: Boolean;
 
 function IsDataDownload(): Boolean;
@@ -163,30 +162,26 @@ procedure InitializeWizard();
 begin
   DataDownload := False;
   HDDownload := False;
-  DataPage := CreateInputQueryPage(wpWelcome,
+  // no access data needed: the FKK server serves the files without a password
+  DataPage := CreateInputOptionPage(wpWelcome,
     'Zero Hour nicht gefunden',
     'Spieldaten vom FKK-Server laden',
-    'Auf diesem PC wurde kein C&C Generals Zero Hour gefunden. Gib die Zugangsdaten für den FKK-Spieldaten-Download ein (bekommst du von Kewe).' + #13#10 + #13#10 +
-    'Lass die Felder leer, wenn du den Zero-Hour-Ordner lieber selbst auswählen willst.');
-  DataPage.Add('Benutzername:', False);
-  DataPage.Add('Passwort:', True);
+    'Auf diesem PC wurde kein C&C Generals Zero Hour gefunden. Der Installer kann die Spieldaten direkt vom FKK-Server laden (ca. 3 GB).',
+    True, False);
+  DataPage.Add('Spieldaten vom FKK-Server laden (empfohlen)');
+  DataPage.Add('Zero-Hour-Ordner selbst auswählen');
+  DataPage.Values[0] := True;
   DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), 'Dateien werden vom FKK-Server geladen ...', nil);
 
   // optional HD textures (AI-upscaled originals), same server and access data
-  HDPage := CreateInputQueryPage(wpSelectDir,
+  HDPage := CreateInputOptionPage(wpSelectDir,
     'HD-Texturen (optional)',
     'Schärfere Einheiten und Gebäude',
     'Die FKK-Edition kann hochgerechnete Texturen (doppelte Auflösung) für Einheiten und Gebäude mitladen ({#HDSize}). ' +
-    'Gameplay und Online-Spiel bleiben gleich, es braucht nur mehr Grafikspeicher.' + #13#10 + #13#10 +
-    'Zugangsdaten wie beim FKK-Spieldaten-Download (bekommst du von Kewe).');
-  HDPage.Add('Benutzername:', False);
-  HDPage.Add('Passwort:', True);
-  HDCheck := TNewCheckBox.Create(HDPage);
-  HDCheck.Parent := HDPage.Surface;
-  HDCheck.Caption := 'HD-Texturen laden';
-  HDCheck.Checked := True;
-  HDCheck.Top := HDPage.Edits[1].Top + HDPage.Edits[1].Height + ScaleY(16);
-  HDCheck.Width := HDPage.SurfaceWidth;
+    'Gameplay und Online-Spiel bleiben gleich, es braucht nur mehr Grafikspeicher.',
+    False, False);
+  HDPage.Add('HD-Texturen laden');
+  HDPage.Values[0] := True;
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
@@ -202,32 +197,21 @@ function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
   if CurPageID = DataPage.ID then begin
-    DataDownload := (Trim(DataPage.Values[0]) <> '') and (DataPage.Values[1] <> '');
+    DataDownload := DataPage.Values[0];
     if DataDownload then
       WizardForm.DirEdit.Text := ExpandConstant('{commonpf32}\Generals FKK Edition\Zero Hour');
     Exit;
   end;
   if CurPageID = HDPage.ID then begin
-    // reuse the game-data access entered before
-    if DataDownload and (Trim(HDPage.Values[0]) = '') then begin
-      HDPage.Values[0] := DataPage.Values[0];
-      HDPage.Values[1] := DataPage.Values[1];
-    end;
-    HDDownload := HDCheck.Checked;
-    if HDDownload and ((Trim(HDPage.Values[0]) = '') or (HDPage.Values[1] = '')) then begin
-      MsgBox('Für die HD-Texturen bitte Benutzername und Passwort eingeben oder den Haken entfernen.', mbInformation, MB_OK);
-      Result := False;
-    end;
+    HDDownload := HDPage.Values[0];
     Exit;
   end;
   if (CurPageID = wpReady) and (DataDownload or HDDownload) then begin
     DownloadPage.Clear;
     if DataDownload then begin
-      SetDownloadCredentials(Trim(DataPage.Values[0]), DataPage.Values[1]);
       DownloadPage.Add('{#DataBaseURL}{#ZHDataFile}', '{#ZHDataFile}', '{#ZHDataSHA256}');
       DownloadPage.Add('{#DataBaseURL}{#GenDataFile}', '{#GenDataFile}', '{#GenDataSHA256}');
-    end else
-      SetDownloadCredentials(Trim(HDPage.Values[0]), HDPage.Values[1]);
+    end;
     if HDDownload then begin
       AddHDPart('{#HDFile1}', '{#HDSHA1}');
       AddHDPart('{#HDFile2}', '{#HDSHA2}');
@@ -241,11 +225,10 @@ begin
         if DownloadPage.AbortedByUser then
           Log('Download abgebrochen')
         else
-          MsgBox('Download vom FKK-Server fehlgeschlagen (falsches Passwort oder Server nicht erreichbar):' + #13#10 + GetExceptionMessage, mbError, MB_OK);
+          MsgBox('Download vom FKK-Server fehlgeschlagen (Server nicht erreichbar?):' + #13#10 + GetExceptionMessage, mbError, MB_OK);
         Result := False;
       end;
     finally
-      SetDownloadCredentials('', '');
       DownloadPage.Hide;
     end;
     Exit;
