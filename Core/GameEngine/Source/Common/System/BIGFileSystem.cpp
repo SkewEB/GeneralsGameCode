@@ -80,18 +80,66 @@ BIGFileSystem::BIGFileSystem() : ArchiveFileSystem() {
 BIGFileSystem::~BIGFileSystem() {
 }
 
+#if RTS_ZEROHOUR
+// lower case, backslashes only
+static AsciiString normalizePath(const char* path)
+{
+	char buffer[_MAX_PATH];
+	size_t i = 0;
+	for (; path[i] != 0 && i < ARRAY_SIZE(buffer) - 1; ++i)
+		buffer[i] = (path[i] == '/') ? '\\' : static_cast<char>(tolower(static_cast<unsigned char>(path[i])));
+	buffer[i] = 0;
+	return AsciiString(buffer);
+}
+
+// FKK: the Generals data can live in a subfolder of the Zero Hour folder (the FKK installer's
+// "GeneralsBase" folder). The game folder is searched recursively and in alphabetical order,
+// so "GeneralsBase\INI.big" would be loaded before "INIZH.big" and its Generals INI files
+// (e.g. Weapon.ini with FLESHY_SNIPER) would win over the Zero Hour ones, which crashes at
+// startup. Returns that subfolder relative to the game folder, or an empty string.
+static AsciiString getGeneralsSubdir(const AsciiString& installPath)
+{
+	AsciiString result;
+	if (installPath.isEmpty())
+		return result;
+
+	char gameDir[_MAX_PATH];
+	char generalsDir[_MAX_PATH];
+	if (GetFullPathNameA(".", ARRAY_SIZE(gameDir), gameDir, nullptr) == 0 ||
+		GetFullPathNameA(installPath.str(), ARRAY_SIZE(generalsDir), generalsDir, nullptr) == 0)
+		return result;
+
+	AsciiString game = normalizePath(gameDir);
+	AsciiString generals = normalizePath(generalsDir);
+	if (!game.endsWith("\\"))
+		game.concat('\\');
+	if (!generals.endsWith("\\"))
+		generals.concat('\\');
+
+	if (generals.getLength() > game.getLength() && generals.startsWith(game))
+		result = generals.str() + game.getLength();
+	return result;
+}
+#endif
+
 void BIGFileSystem::init() {
 	DEBUG_ASSERTCRASH(TheLocalFileSystem != nullptr, ("TheLocalFileSystem must be initialized before TheArchiveFileSystem."));
 	if (TheLocalFileSystem == nullptr) {
 		return;
 	}
 
+#if RTS_ZEROHOUR
+	AsciiString installPath;
+	GetStringFromGeneralsRegistry("", "InstallPath", installPath );
+	m_generalsSubdir = getGeneralsSubdir(installPath);
+#endif
+
 	loadArchiveFilesFromDirectory("", "*.big");
 
 #if RTS_ZEROHOUR
+	m_generalsSubdir.clear();
+
     // load original Generals assets
-    AsciiString installPath;
-    GetStringFromGeneralsRegistry("", "InstallPath", installPath );
     //@todo this will need to be ramped up to a crash for release
     DEBUG_ASSERTCRASH(!installPath.isEmpty(), ("Be 1337! Go install Generals!"));
     if (!installPath.isEmpty())
@@ -238,6 +286,14 @@ Bool BIGFileSystem::loadArchiveFilesFromDirectory(AsciiString dir, AsciiString f
 	FilenameListIter it = filenameList.begin();
 	while (it != filenameList.end()) {
 #if RTS_ZEROHOUR
+		// FKK: the Generals subfolder is loaded after Zero Hour, see getGeneralsSubdir
+		if (m_generalsSubdir.isNotEmpty()) {
+			if (normalizePath((*it).str()).startsWith(m_generalsSubdir)) {
+				it++;
+				continue;
+			}
+		}
+
 		// TheSuperHackers @bugfix bobtista 18/11/2025 Skip duplicate INIZH.big in Data\INI to prevent CRC mismatches.
 		// English, Chinese, and Korean SKUs shipped with two INIZH.big files (one in Run directory, one in Run\Data\INI).
 		// The DeleteFile cleanup doesn't work on EA App/Origin installs because the folder is not writable, so we skip loading it instead.
