@@ -58,6 +58,11 @@ Source: "dxvk\dxvk.conf"; DestDir: "{app}\fkk-dxvk"; Flags: ignoreversion
 Source: "dxvk\LICENSE.txt"; DestDir: "{app}\fkk-dxvk"; Flags: ignoreversion
 Source: "dxvk\README.txt"; DestDir: "{app}\fkk-dxvk"; Flags: ignoreversion
 Source: "output\fkk-version.txt"; DestDir: "{app}"; Flags: ignoreversion
+; Visual C++ runtime (x86), collected by the workflow from the runner's Visual Studio.
+; The DLLs sit next to generalszh.exe so the game starts even without a system-wide runtime
+; (fixes "VCRUNTIME140.dll nicht gefunden"); vc_redist also installs it system-wide if missing.
+Source: "vcredist\dlls\*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "vcredist\vc_redist.x86.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall skipifsourcedoesntexist
 
 [Icons]
 Name: "{autodesktop}\Generals FKK Edition"; Filename: "{app}\FKK-Starter.exe"; WorkingDir: "{app}"; IconFilename: "{app}\fkk.ico"
@@ -81,6 +86,7 @@ Type: files; Name: "{autodesktop}\Generals ZH FKK Edition.lnk"
 Type: files; Name: "{autoprograms}\Generals ZH FKK Edition.lnk"
 
 [Run]
+Filename: "{tmp}\vc_redist.x86.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Microsoft Visual C++ Runtime wird installiert ..."; Flags: waituntilterminated; Check: NeedsVCRedist
 ; after a silent auto-update: start the game again as the normal user
 Filename: "{app}\FKK-Starter.exe"; Parameters: "-noupdate"; WorkingDir: "{app}"; Flags: nowait runasoriginaluser; Check: IsAutoUpdate
 Filename: "{app}\FKK-Starter.exe"; Parameters: "-noupdate"; WorkingDir: "{app}"; Description: "Spiel jetzt starten"; Flags: nowait postinstall skipifsilent runasoriginaluser
@@ -96,6 +102,18 @@ var
 function IsDataDownload(): Boolean;
 begin
   Result := DataDownload;
+end;
+
+// x86 VC++ 2015-2022 runtime registered system-wide? (32-bit registry view)
+function NeedsVCRedist(): Boolean;
+var
+  Installed: Cardinal;
+begin
+  Result := FileExists(ExpandConstant('{tmp}\vc_redist.x86.exe'));
+  if Result and RegQueryDWordValue(HKLM32, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X86', 'Installed', Installed) then
+    Result := Installed <> 1;
+  if Result then
+    Log('VC++ runtime x86 not found, installing vc_redist.x86.exe');
 end;
 
 function IsAutoUpdate(): Boolean;

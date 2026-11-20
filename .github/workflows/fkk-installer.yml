@@ -85,6 +85,35 @@ jobs:
           Copy-Item "dxvk-src\dxvk-$env:DXVK_VERSION\x32\d3d8.dll", "dxvk-src\dxvk-$env:DXVK_VERSION\x32\d3d9.dll" fkk\installer\dxvk\
           Get-ChildItem fkk\installer\dxvk | Format-Table Name, Length
 
+      # Visual C++ runtime (x86): generalszh.exe is built with /MD and needs VCRUNTIME140.dll etc.
+      # The CRT DLLs go next to the exe (app-local, works without admin rights or internet) and
+      # vc_redist.x86.exe is bundled so the installer can also install the runtime system-wide.
+      # Both come from the runner's Visual Studio install, which is at least as new as the build toolset.
+      - name: Collect VC++ runtime
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw "Visual Studio with C++ tools not found" }
+          $redist = Get-ChildItem "$vs\VC\Redist\MSVC" -Directory |
+            Where-Object { Test-Path "$($_.FullName)\vc_redist.x86.exe" } |
+            Sort-Object { [version]($_.Name -replace '[^0-9.]', '') } -Descending | Select-Object -First 1
+          if (-not $redist) { throw "vc_redist.x86.exe not found under $vs\VC\Redist\MSVC" }
+          $crt = Get-ChildItem "$($redist.FullName)\x86" -Directory -Filter "Microsoft.VC*.CRT" | Select-Object -First 1
+          if (-not $crt) { throw "x86 CRT folder not found in $($redist.FullName)" }
+          New-Item -ItemType Directory -Force fkk\installer\vcredist\dlls | Out-Null
+          Copy-Item "$($crt.FullName)\*.dll" fkk\installer\vcredist\dlls\
+          Copy-Item "$($redist.FullName)\vc_redist.x86.exe" fkk\installer\vcredist\
+          foreach ($f in "vcruntime140.dll", "msvcp140.dll") {
+            if (-not (Test-Path "fkk\installer\vcredist\dlls\$f")) { throw "$f missing in $($crt.FullName)" }
+          }
+          $sig = Get-AuthenticodeSignature fkk\installer\vcredist\vc_redist.x86.exe
+          if ($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notmatch "O=Microsoft Corporation") {
+            throw "vc_redist.x86.exe signature check failed: $($sig.Status)"
+          }
+          "Redist $($redist.Name):"
+          Get-ChildItem fkk\installer\vcredist -Recurse -File | Format-Table Name, Length, @{n='Version';e={$_.VersionInfo.FileVersion}}
+
       - name: Build starter
         shell: pwsh
         run: |
