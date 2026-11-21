@@ -95,9 +95,13 @@ jobs:
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           if (-not $vs) { throw "Visual Studio with C++ tools not found" }
-          $redist = Get-ChildItem "$vs\VC\Redist\MSVC" -Directory |
-            Where-Object { Test-Path "$($_.FullName)\vc_redist.x86.exe" } |
-            Sort-Object { [version]($_.Name -replace '[^0-9.]', '') } -Descending | Select-Object -First 1
+          # folders are named by version (14.44.35112) or by toolset (v145); prefer the newest version folder
+          $candidates = Get-ChildItem "$vs\VC\Redist\MSVC" -Directory |
+            Where-Object { Test-Path "$($_.FullName)\vc_redist.x86.exe" }
+          $candidates | ForEach-Object { "candidate: $($_.Name)" }
+          $redist = $candidates | Where-Object { $_.Name -match '^\d+(\.\d+){1,3}$' } |
+            Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+          if (-not $redist) { $redist = $candidates | Sort-Object Name -Descending | Select-Object -First 1 }
           if (-not $redist) { throw "vc_redist.x86.exe not found under $vs\VC\Redist\MSVC" }
           $crt = Get-ChildItem "$($redist.FullName)\x86" -Directory -Filter "Microsoft.VC*.CRT" | Select-Object -First 1
           if (-not $crt) { throw "x86 CRT folder not found in $($redist.FullName)" }
