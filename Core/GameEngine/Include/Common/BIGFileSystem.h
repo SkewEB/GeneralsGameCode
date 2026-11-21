@@ -54,4 +54,10 @@ public:
 	virtual void loadMods() override;
 protected:
 
+#if RTS_ZEROHOUR
+	// FKK: subfolder of the game folder that holds the original Generals install (lower case,
+	// trailing backslash). It is skipped in the game folder pass and loaded after Zero Hour.
+	AsciiString m_generalsSubdir;
+#endif
+
 };
